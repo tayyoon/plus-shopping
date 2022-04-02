@@ -1,7 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const {Op} = require("sequelize");
 const Joi = require("joi");
-const User = require("./models/user");
+const {User} = require("./models");
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("./middlewares/auth-middleware");
 const res = require("express/lib/response");
@@ -36,8 +37,10 @@ router.post("/users", async (req, res) => {
         return; // return 을 하지않으면 패스워드가 다르더라도 그냥 다음 코드가 실행이 되어버린다. 예외를 줄여나가기 위한것이다.
     }
     // 회원가입시 닉네임과 이메일을 find로 또는 으로 받아온다.
-    const existUser = await User.find({
-        $or: [{email}, {nickname}],
+    const existUser = await User.findAll({
+        where: {
+            [Op.or]: [{nickname}, {email}],
+        },
     });
     // 만약 닉네임, 이메일이 겹치는것이 있으면 bad request인 400을 주고 에러 메세지를 날려준다. 다음으로 진행되지 않기 위해서 returnd으로 막아준다.
     if (existUser.length) {
@@ -47,9 +50,9 @@ router.post("/users", async (req, res) => {
         return;
     }
     // 위쪽에서 의 조건을 다 만족하면 데이터베이스에 사용자 정보를 저장해도 괜찮기 때문에 데이터베이스에 필요한 것들만 저장을 해줌
-    const user = new User({email, nickname, password});
+    await User.create({email, nickname, password});
     // user의 정보를 확실하게 저장을 해주는 것
-    await user.save();
+    // await user.save();
     // 응답값을 줘야함 기본적으로 200의 성공 코드가 넘어가므로 문제가 없다. 하지만 회원가입 creat는 rest API에 의해서 201 코드를 주는게 적합하다.
     res.status(201).send({});
     } catch (error) {
@@ -67,13 +70,13 @@ const postAuthSchema = Joi.object({
 
 router.post("/auth", async (req, res) => {
     
-    try {
+    // try {
         const {email, password} = await postAuthSchema.validateAsync(req.body);
 
-        const user = await User.findOne({ email, password}).exec();
+        const user = await User.findOne({ where: { email, password}});
 
         if (!user) {
-            res.status(401).send({
+            res.status(400).send({
                 errorMessage: "이메일 또는 패스워드가 잘못 됐습니다~"
             });
             return;
@@ -83,12 +86,12 @@ router.post("/auth", async (req, res) => {
         res.send({
             token,
         });
-    } catch (error) {
-        console.log(error)
-        res.status(400).send({
-            errorMessage: "요청한 데이터 형식이 틀렸어!!!"
-        });
-    }
+    // } catch (error) {
+        // console.log(error)
+        // res.status(400).send({
+        //     errorMessage: "요청한 데이터 형식이 틀렸어!!!"
+        // });
+    // }
     
 });
 
